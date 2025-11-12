@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSC Quotes Templates</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Zoho SDK - REQUIRED FOR PRODUCTION -->
+    <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+    <style>
+        /* Custom Styles for Inter Font and Error Messages */
+        body { font-family: 'Inter', sans-serif; }
+        .error-message {
+            color: #ef4444; /* Tailwind red-500 */
+            font-size: 0.75rem; /* Reduced font size for tighter look */
+            margin-top: 0.25rem;
+            display: block;
+            min-height: 1rem; /* Ensure stability */
+        }
+        /* Custom focus ring color */
+        input:focus, select:focus {
+            border-color: #2563eb; /* blue-600 */
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
+            outline: none;
+        }
+        .form-input {
+            transition: all 0.15s ease-in-out;
+            padding: 0.5rem; /* p-2 */
+            font-size: 0.875rem; /* text-sm */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-4 flex justify-center">
+
+    <div class="w-full max-w-2xl bg-white shadow-xl rounded-xl p-4 sm:p-6">
+        <h1 class="text-xl font-extrabold text-indigo-700 mb-4 border-b pb-2">
+            BSC Quotes Templates
+        </h1>
+        <p class="text-sm text-gray-500 mb-4" id="zoho-context-info">
+            <!-- Loading Zoho context... -->
+        </p>
+
+        <form id="record-form" novalidate>
+            <div class="grid grid-cols-1 gap-x-6 gap-y-3">
+
+                <!-- Template Selection -->
+                <div class="space-y-3 md:col-span-2">
+                    <div>
+                        <label for="template-select" class="block text-sm font-medium text-gray-700">Select Quote Template <span class="text-red-500">*</span></label>
+                        <select id="template-select" name="template-select" class="form-input mt-1 block w-full border border-gray-300 rounded-lg shadow-sm bg-white cursor-pointer" disabled>
+                            <option value="" disabled selected>Loading Quotes Templates...</option>
+                        </select>
+                        <span class="error-message" id="error-template-select"></span>
+                    </div>
+                </div>
+                
+                <!-- Submission and Actions -->
+                <div class="mt-4 pt-3 border-t md:col-span-2 flex justify-end">
+                    <button type="submit" id="submit_button_id" class="flex items-center justify-center px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-offset-2 transition duration-300 ease-in-out text-sm disabled:bg-indigo-400" disabled>
+                        <svg id="loading-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span id="button-text">Create Quote</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Notification Modal (Used instead of alert/confirm) -->
+    <div id="notification-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden z-50 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" aria-modal="true" role="dialog">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm transform scale-95 transition-transform duration-300">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-gray-800"></h3>
+            <p id="modal-message" class="text-gray-600 mb-6"></p>
+            <button id="modal-close-btn" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition duration-150 font-medium">
+                OK, Got It
+            </button>
+        </div>
+    </div>
+
+    <!-- Link the external JavaScript file -->
+    <script src="/app/js/app.js"></script>
+</body>
+</html>
