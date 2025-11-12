@@ -1,21 +1,23 @@
-// --- DOM Elements ---
-// We're renaming 'bpDropdown' to 'quoteTemplateDropdown' to reflect the field's purpose.
-const form = document.getElementById("record-form");
-const quoteTemplateDropdown = document.getElementById('business-partner'); // Still using the same ID for simplicity
+// --- GLOBAL STATE ---
+let currentRecordId = null;
+let currentModule = null;
+
+// --- DOM Element References ---
 const submitButton = document.getElementById('submit_button_id');
-const buttonText = document.getElementById('button-text');
 const loadingSpinner = document.getElementById('loading-spinner');
+const buttonText = document.getElementById('button-text');
+const templateSelect = document.getElementById('template-select');
+const form = document.getElementById('record-form');
 
 // --- Validation Configuration ---
 const fieldsConfig = [
-    // This configuration marks the field as required.
-    { id: "business-partner", label: "Quote Templates", type: 'text', errorId: "error-business-partner" },
+    { id: "template-select", label: "Existing Quote", type: 'text', errorId: "error-template-select" },
 ];
 
 // --- Utility Functions ---
 
 /**
- * Shows the custom notification modal.
+ * Displays a custom modal notification.
  * @param {string} title - The modal title.
  * @param {string} message - The modal message.
  * @param {boolean} isSuccess - Determines styling (green for success, red for error).
@@ -42,6 +44,7 @@ function showModal(title, message, isSuccess = false) {
     setTimeout(() => {
         modal.classList.remove('opacity-0');
         modal.querySelector('div').classList.remove('scale-95');
+        modal.querySelector('div').classList.add('scale-100');
     }, 10);
 }
 
@@ -61,7 +64,9 @@ document.getElementById('modal-close-btn').addEventListener('click', hideModal);
 
 /** Sets an error message and highlights the input field. */
 const setError = (field, message) => {
-    const errorElement = document.getElementById(`error-${field.id}`);
+    const errorElementId = `error-${field.id}`; 
+    const errorElement = document.getElementById(errorElementId);
+    
     if (errorElement) {
         errorElement.textContent = message;
     }
@@ -84,65 +89,76 @@ function clearForm() {
     });
 }
 
-// --- Close Widget ---
+/** Attempts to close the Zoho widget window and reload the parent CRM page. */
 async function closeWidget() {
-    // This function attempts to close the Zoho widget window.
+    // Uses the Zoho UI SDK method to close the widget and trigger a parent page reload
     await ZOHO.CRM.UI.Popup.closeReload().catch(err => console.error("Error closing widget:", err));
 }
 
 /**
-* Loads Quote Template data from Zoho CRM.
+* Loads all Quote data from Zoho CRM without client-side filtering.
 */
 async function loadDropdownData() {
-    // Clear existing options
-    while (quoteTemplateDropdown.options.length > 1) { quoteTemplateDropdown.remove(1); }
+    // Clear existing options, keeping only the disabled placeholder
+    while (templateSelect.options.length > 1) { templateSelect.remove(1); }
+    templateSelect.disabled = true; // Disable while loading
 
-    // NOTE: Assuming "Quotes_Templates" is the module name in Zoho CRM. Adjust if needed.
     try {
-        const templateResponse = await ZOHO.CRM.API.getAllRecords({ Entity: "Quotes_Templates", sort_order: "asc" });
+        // Fetch all Quote records using the Zoho CRM API
+        const quoteResponse = await ZOHO.CRM.API.getAllRecords({ 
+            Entity: "Quotes", 
+            sort_order: "desc", 
+            perPage: 200 // Max records to fetch per API call
+        });
 
-        if (templateResponse.data && templateResponse.data.length > 0) {
-            const activeTemplates = templateResponse.data.filter(template => template.Name); // Simple check for name existence
-            activeTemplates.forEach(template => {
-                const option = document.createElement('option');
-                // Store the Record ID in the value
-                option.value = template.id;
-                option.textContent = template.Name;
-                quoteTemplateDropdown.appendChild(option);
+        if (quoteResponse.data && quoteResponse.data.length > 0) {
+            
+            const allQuotes = quoteResponse.data;
+            
+            allQuotes.forEach(quote => {
+                // Ensure the quote has a Subject before adding
+                if (quote.Subject && quote.id) {
+                    const option = document.createElement('option');
+                    option.value = quote.id;
+                    option.textContent = quote.Subject;
+                    templateSelect.appendChild(option);
+                }
             });
-            console.log(`Loaded ${activeTemplates.length} Quote Templates.`);
-            // Update initial loading message
-            quoteTemplateDropdown.options[0].textContent = 'Select a Quote Template';
-            // CRITICAL: Ensure the placeholder value is explicitly empty string for validation
-            quoteTemplateDropdown.options[0].value = ''; 
+            
+            console.log(`Loaded ${allQuotes.length} Quotes (No client-side filtering applied).`);
+            
+            templateSelect.options[0].textContent = 'Select an Existing Quote';
+            templateSelect.options[0].value = ''; // CRITICAL: Ensure the placeholder value is empty
+            templateSelect.disabled = false;
         } else {
-            quoteTemplateDropdown.options[0].textContent = 'No Quote Templates Found';
-            quoteTemplateDropdown.options[0].value = ''; // Ensure the value remains empty for validation
+            templateSelect.options[0].textContent = 'No Quote Records Found';
+            templateSelect.options[0].value = ''; 
         }
     } catch (error) {
-        console.error("Error fetching Quote Templates via Zoho API:", error);
-        quoteTemplateDropdown.options[0].textContent = 'Error Loading Templates';
-        quoteTemplateDropdown.options[0].value = ''; // Ensure the value remains empty for validation
+        console.error("Error fetching Quote Records via Zoho API:", error);
+        templateSelect.options[0].textContent = 'Error Loading Quotes';
+        templateSelect.options[0].value = ''; 
     }
 }
 
 /**
- * Executes a function in Zoho CRM to create a Quote based on the selected template.
+ * Executes a function in Zoho CRM to create a Quote based on the selected existing quote record.
  */
 async function createQuoteInZoho() {
     submitButton.disabled = true;
     buttonText.textContent = 'Creating...';
     loadingSpinner.classList.remove('hidden');
 
-    console.log('Preparing to create Quote in Zoho CRM...');
+    console.log('Preparing to clone Quote in Zoho CRM...');
 
-    // NOTE: Assuming "ta_create_quote_from_template" is the new Zoho function name.
+    // The name of the Zoho Custom Function (must exist in Zoho CRM)
     const func_name = "ta_create_quote_from_template";
     
-    // We only need to pass the selected template ID (which is currently stored in the 'business-partner' field)
+    // Pass the selected Quote ID and the ID of the parent record (e.g., Deal)
     const req_data = {
         "arguments": JSON.stringify({
-            "template_id": quoteTemplateDropdown.value, 
+            "template_id": templateSelect.value, 
+            "parent_record_id": currentRecordId 
         })
     };
 
@@ -150,18 +166,17 @@ async function createQuoteInZoho() {
         const quote_res = await ZOHO.CRM.FUNCTIONS.execute(func_name, req_data);
         console.log("Quote Creation Function Response:", quote_res);
 
-        // Assuming the function returns a simple user message indicating success
-        const creation_status = quote_res.details.userMessage;
+        const userMessage = quote_res?.details?.userMessage;
 
-        if (creation_status && creation_status.includes('true')) {
-            console.log('Quote record created successfully.');
-            showModal('Success', 'Quote created successfully using the selected template.', true);
+        // Check for successful execution and a 'true' message from the custom function
+        if (quote_res.code === 'SUCCESS' && userMessage && userMessage.includes('true')) {
+            console.log('New Quote record successfully initiated via Zoho Function.');
+            showModal('Success', 'New Quote record successfully created based on the selected existing Quote.', true);
             clearForm();
-            setTimeout(closeWidget, 2000); // Close widget after success
+            setTimeout(closeWidget, 2000); 
         } else {
-            // Log the full response for debugging if it's not a clear 'true'
-            console.error("Zoho function did not return success:", creation_status);
-            const errorMsg = 'Failed to create Quote. The Zoho function reported an issue.';
+            console.error("Zoho function did not return clear success:", quote_res);
+            const errorMsg = 'Failed to create Quote. The Zoho function reported an issue or returned an unexpected response.';
             showModal('Submission Error', errorMsg, false);
         }
 
@@ -169,7 +184,7 @@ async function createQuoteInZoho() {
         console.error("Critical error during Zoho submission:", error);
         showModal('API Error', 'A critical error occurred while communicating with Zoho CRM. Please check the console for details.', false);
     } finally {
-        // Re-enable button if widget closing failed or on error
+        // Reset button state only if it was disabled by this function
         if (submitButton.disabled) {
             submitButton.disabled = false;
             buttonText.textContent = 'Create Quote';
@@ -186,57 +201,56 @@ document.addEventListener("DOMContentLoaded", function () {
     form.addEventListener("submit", function (event) {
         event.preventDefault();
         
-        const config = fieldsConfig[0]; // Quote Templates field
-        const selectedValue = quoteTemplateDropdown.value.trim();
-        // The most robust check: if the selected index is the first option (0)
-        const isPlaceholderSelected = quoteTemplateDropdown.selectedIndex === 0;
+        const config = fieldsConfig.find(c => c.id === 'template-select');
+        const selectedValue = templateSelect.value.trim();
+        const isPlaceholderSelected = templateSelect.selectedIndex === 0 || !selectedValue;
 
-        // Reset error state for the field
-        setError(quoteTemplateDropdown, "");
-        quoteTemplateDropdown.classList.remove('border-red-500');
-        quoteTemplateDropdown.classList.add('border-gray-300');
+        setError(templateSelect, "");
 
-
-        // *** CRITICAL MANDATORY VALIDATION CHECK ***
-        if (!selectedValue || isPlaceholderSelected) {
-            
-            // Set error message and style
-            setError(quoteTemplateDropdown, `${config.label} selection is mandatory.`);
-
-            // Display a clear, non-blocking modal notification
-            showModal('Action Required', `Please select a **${config.label}** from the dropdown list before clicking 'Create Quote'.`, false);
-            
-            // Block form submission
+        // Mandatory validation check
+        if (isPlaceholderSelected) {
+            setError(templateSelect, `${config.label} selection is mandatory.`);
+            showModal('Action Required', `Please select an **${config.label}** from the dropdown list before clicking 'Create Quote'.`, false);
             return;
         }
 
-        // If validation passes, proceed to create the quote
         createQuoteInZoho();
     });
 
     // 2. Initialize the Zoho SDK and load data upon ready state
-    ZOHO.embeddedApp.on("PageLoad", entity => {
-    // This is the information about the current record, if applicable.
-    let entity_id = entity.EntityId[0];
-    console.log("Entity ID: " + entity_id);
-    //Get Record
-    ZOHO.CRM.API.getRecord({
-    Entity: "Deals", approved: "both", RecordID:entity_id
-    })
-   .then(function(data){
-        const quote_data = data.data
-        console.log(quote_data)
-        quote_data.map( (data)=> {
-            const prospect_owner_name = data.Owner.name
-            const prospect_owner_id = data.Owner.id
-            const prospect_owner_email = data.email
-            console.log("Prospect Owner Name: " + prospect_owner_name);
-            console.log("Prospect Owner ID: " + prospect_owner_id);
-            console.log("Prospect Owner Email: " + prospect_owner_email);
-        });   
-      });
-});
+    ZOHO.embeddedApp.on("PageLoad", async (entity) => {
+        try {
+            // Get context information (Module and ID)
+            currentRecordId = entity.EntityId ? entity.EntityId[0] : null;
+            currentModule = entity.Entity; // e.g., 'Deals' or 'Quotes'
+            
+            console.log(`Widget loaded on module: ${currentModule}, Record ID: ${currentRecordId}`);
+
+            // 1. Fetch data for the dropdown
+            await loadDropdownData(); 
+
+            // 2. Enable UI elements if data was loaded
+            if (templateSelect.options.length > 1 && currentRecordId) {
+                submitButton.disabled = false;
+            }
+
+            // 3. (Optional) Fetch the current Deal/Quote record details for context
+            if (currentRecordId && currentModule === "Deals") {
+                const recordResponse = await ZOHO.CRM.API.getRecord({
+                    Entity: currentModule, approved: "both", RecordID: currentRecordId
+                });
+
+                if (recordResponse.data && recordResponse.data.length > 0) {
+                    console.log("Parent Record Data fetched successfully.");
+                }
+            }
+        } catch (error) {
+            console.error("Initialization error:", error);
+            showModal('Initialization Failed', 'Could not load required data from Zoho CRM. See console for details.', false);
+            templateSelect.options[0].textContent = "Failed to load Quotes";
+        }
+    });
+
     // Start the SDK initialization process
     ZOHO.embeddedApp.init();
-
 });
