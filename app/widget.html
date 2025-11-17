@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BSC Quotes Templates</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Zoho SDK - REQUIRED FOR PRODUCTION -->
     <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
     <style>
         /* Custom Styles for Inter Font and Error Messages */
@@ -29,6 +27,37 @@
             padding: 0.5rem; /* p-2 */
             font-size: 0.875rem; /* text-sm */
         }
+
+        /* --- Loading Overlay Styles --- */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8); /* Semi-transparent white overlay */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Ensure it is on top of other elements */
+            font-family: sans-serif;
+            color: #333;
+        }
+        /* Simple CSS spinner animation */
+        #spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-50 p-4 flex justify-center">
@@ -38,13 +67,11 @@
             BSC Quotes Templates
         </h1>
         <p class="text-sm text-gray-500 mb-4" id="zoho-context-info">
-            <!-- Loading Zoho context... -->
-        </p>
+            </p>
 
         <form id="record-form" novalidate>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3">
 
-                <!-- Template Selection -->
                 <div class="space-y-3 md:col-span-2">
                     <div>
                         <label for="template-select" class="block text-sm font-medium text-gray-700">Select Quote Template <span class="text-red-500">*</span></label>
@@ -55,7 +82,6 @@
                     </div>
                 </div>
                 
-                <!-- Submission and Actions -->
                 <div class="mt-4 pt-3 border-t md:col-span-2 flex justify-end">
                     <button type="submit" id="submit_button_id" class="flex items-center justify-center px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-offset-2 transition duration-300 ease-in-out text-sm disabled:bg-indigo-400" disabled>
                         <svg id="loading-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -69,7 +95,11 @@
         </form>
     </div>
 
-    <!-- Notification Modal (Used instead of alert/confirm) -->
+    <div id="loadingOverlay" style="display: none;">
+        <div id="spinner"></div>
+        <p>Fetching all templates...</p>
+    </div>
+
     <div id="notification-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden z-50 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" aria-modal="true" role="dialog">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm transform scale-95 transition-transform duration-300">
             <h3 id="modal-title" class="text-xl font-bold mb-3 text-gray-800"></h3>
@@ -80,7 +110,6 @@
         </div>
     </div>
 
-    <!-- Link the external JavaScript file -->
-    <script src="/app/js/app.js"></script>
+   <script src="js/app.js"></script>
 </body>
 </html>

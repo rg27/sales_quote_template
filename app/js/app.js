@@ -1,27 +1,13 @@
-// --- GLOBAL STATE ---
-let currentRecordId = null;
-let currentModule = null;
+// GLOBAL VARIABLE(S) :)
+let currentRecordId, created_quote_id, account_id, prospect_id, contact_id = null;
 
-// --- DOM Element References ---
-const submitButton = document.getElementById('submit_button_id');
-const loadingSpinner = document.getElementById('loading-spinner');
+const templateSelect = document.getElementById("template-select");
+const loadingOverlay = document.getElementById("loadingOverlay");
+const errorTemplate = document.getElementById("error-template-select");
+const submitButton = document.getElementById("submit_button_id");
+const spinner = document.getElementById("loading-spinner");
 const buttonText = document.getElementById('button-text');
-const templateSelect = document.getElementById('template-select');
-const form = document.getElementById('record-form');
 
-// --- Validation Configuration ---
-const fieldsConfig = [
-    { id: "template-select", label: "Existing Quote", type: 'text', errorId: "error-template-select" },
-];
-
-// --- Utility Functions ---
-
-/**
- * Displays a custom modal notification.
- * @param {string} title - The modal title.
- * @param {string} message - The modal message.
- * @param {boolean} isSuccess - Determines styling (green for success, red for error).
- */
 function showModal(title, message, isSuccess = false) {
     const modal = document.getElementById('notification-modal');
     const modalTitle = document.getElementById('modal-title');
@@ -40,7 +26,7 @@ function showModal(title, message, isSuccess = false) {
 
     modal.classList.remove('hidden', 'opacity-0');
     modal.classList.add('flex');
-    // Trigger transition
+
     setTimeout(() => {
         modal.classList.remove('opacity-0');
         modal.querySelector('div').classList.remove('scale-95');
@@ -48,209 +34,225 @@ function showModal(title, message, isSuccess = false) {
     }, 10);
 }
 
-/** Hides the custom notification modal. */
-function hideModal() {
-    const modal = document.getElementById('notification-modal');
-    modal.classList.add('opacity-0');
-    modal.querySelector('div').classList.add('scale-95');
-    setTimeout(() => {
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-    }, 300); // Wait for transition
-}
-
-// Attach listener to modal close button
-document.getElementById('modal-close-btn').addEventListener('click', hideModal);
-
-/** Sets an error message and highlights the input field. */
-const setError = (field, message) => {
-    const errorElementId = `error-${field.id}`; 
-    const errorElement = document.getElementById(errorElementId);
-    
-    if (errorElement) {
-        errorElement.textContent = message;
-    }
-    if (message) {
-        field.classList.add('border-red-500');
-        field.classList.remove('border-gray-300');
-    } else {
-        field.classList.remove('border-red-500');
-        field.classList.add('border-gray-300');
-    }
-};
-
-/** Clears the form and resets error indicators. */
-function clearForm() {
-    form.reset();
-    document.querySelectorAll(".error-message").forEach((el) => (el.textContent = ""));
-    document.querySelectorAll(".border-red-500").forEach((el) => {
-        el.classList.remove('border-red-500');
-        el.classList.add('border-gray-300');
-    });
-}
-
-/** Attempts to close the Zoho widget window and reload the parent CRM page. */
 async function closeWidget() {
-    // Uses the Zoho UI SDK method to close the widget and trigger a parent page reload
     await ZOHO.CRM.UI.Popup.closeReload().catch(err => console.error("Error closing widget:", err));
 }
 
-/**
-* Loads all Quote data from Zoho CRM without client-side filtering.
-*/
 async function loadDropdownData() {
-    // Clear existing options, keeping only the disabled placeholder
     while (templateSelect.options.length > 1) { templateSelect.remove(1); }
-    templateSelect.disabled = true; // Disable while loading
+    templateSelect.disabled = true;
 
     try {
-        // Fetch all Quote records using the Zoho CRM API
-        const quoteResponse = await ZOHO.CRM.API.getAllRecords({ 
-            Entity: "Quotes", 
-            sort_order: "desc", 
-            perPage: 200 // Max records to fetch per API call
+        const func_name = "filter_quote_records";
+        const response = await ZOHO.CRM.FUNCTIONS.execute(func_name, {});
+        let raw = response.details.output;
+
+        raw = "[" + raw.replace(/}\s*{/g, "},{") + "]";
+
+        let quoteRespo = JSON.parse(raw);
+
+        if (!Array.isArray(quoteRespo)) {
+            quoteRespo = [quoteRespo];
+        }
+
+        templateSelect.innerHTML = '<option value="" disabled selected>Select Quote Template</option>';
+        quoteRespo.forEach(q => {
+            const option = document.createElement("option");
+            option.value = q.id;
+            option.textContent = q.Subject;
+            option.dataset.quoteNumber = q.Quote_Number;
+            option.dataset.quoteStage = q.Quote_Stage;
+            option.dataset.currency = q.Currency;
+            option.dataset.grandTotal = q.Grand_Total;
+            option.dataset.accountName = q.Account_Name?.id || "";
+            option.dataset.dealName = q.Deal_Name?.id || "";
+            option.dataset.templateName = q.Template_Name_Sales || "";
+            option.dataset.validTill = q.Valid_Till || "";
+            option.dataset.productDetails = JSON.stringify(q.Product_Details);
+            templateSelect.appendChild(option);
         });
 
-        if (quoteResponse.data && quoteResponse.data.length > 0) {
-            
-            const allQuotes = quoteResponse.data;
-            
-            allQuotes.forEach(quote => {
-                // Ensure the quote has a Subject before adding
-                if (quote.Subject && quote.id) {
-                    const option = document.createElement('option');
-                    option.value = quote.id;
-                    option.textContent = quote.Subject;
-                    templateSelect.appendChild(option);
-                }
-            });
-            
-            console.log(`Loaded ${allQuotes.length} Quotes (No client-side filtering applied).`);
-            
-            templateSelect.options[0].textContent = 'Select an Existing Quote';
-            templateSelect.options[0].value = ''; // CRITICAL: Ensure the placeholder value is empty
-            templateSelect.disabled = false;
-        } else {
-            templateSelect.options[0].textContent = 'No Quote Records Found';
-            templateSelect.options[0].value = ''; 
-        }
-    } catch (error) {
-        console.error("Error fetching Quote Records via Zoho API:", error);
+        templateSelect.disabled = false;
+        submitButton.disabled = false;
+
+        console.log("Subjects loaded:", quoteRespo.map(q => q.Subject));
+
+    } catch (err) {
+        console.error("Error loading dropdown data:", err);
+        errorTemplate.textContent = "Failed to load quote templates.";
         templateSelect.options[0].textContent = 'Error Loading Quotes';
         templateSelect.options[0].value = ''; 
+        templateSelect.disabled = true;
     }
 }
 
-/**
- * Executes a function in Zoho CRM to create a Quote based on the selected existing quote record.
- */
-async function createQuoteInZoho() {
+document.getElementById("record-form").addEventListener("submit", createQuoteInZoho);
+
+async function createQuoteInZoho(event) {
+    event.preventDefault();
+
+        const selectedValue = templateSelect.value;
+    if (!selectedValue || selectedValue === "") {
+        showModal(
+            "Missing Required Field",
+            "Please select a Quote Template from the dropdown list before clicking 'Create Quote'.",
+            false
+        );
+
+        submitButton.disabled = false;
+        buttonText.textContent = 'Create Quote';
+        spinner.classList.add('hidden');
+
+        return;
+    }
+
     submitButton.disabled = true;
     buttonText.textContent = 'Creating...';
-    loadingSpinner.classList.remove('hidden');
+    spinner.classList.remove('hidden');
 
-    console.log('Preparing to clone Quote in Zoho CRM...');
+    const selectedOption = templateSelect.options[templateSelect.selectedIndex];
+    const productDetails = JSON.parse(selectedOption.dataset.productDetails || "[]");
 
-    // The name of the Zoho Custom Function (must exist in Zoho CRM)
-    const func_name = "ta_create_quote_from_template";
+    const selectedTemplateData = {
+        template_id: selectedOption.value,
+        parent_record_id: currentRecordId,
+        Subject: selectedOption.textContent,
+        Quote_Number: selectedOption.dataset.quoteNumber,
+        Currency: selectedOption.dataset.currency,
+        Grand_Total: selectedOption.dataset.grandTotal,
+        Template_Name_Sales: selectedOption.dataset.templateName,
+        Valid_Till: selectedOption.dataset.validTill,
+        Product_Details: productDetails,
+        Finance_Clearance: false,
+        Process_Clearance: false,
+        Processed_by_SE: false,
+        Quote_Stage: "Draft",
+        Quote_Linked_to_Prospect: true,
+        Account_Name: account_id,
+        Deal_Name: prospect_id,
+        Contact_Name: contact_id
+    };
     
-    // Pass the selected Quote ID and the ID of the parent record (e.g., Deal)
-    const req_data = {
-        "arguments": JSON.stringify({
-            "template_id": templateSelect.value, 
-            "parent_record_id": currentRecordId 
-        })
+
+    const response = await ZOHO.CRM.API.insertRecord({
+        Entity: "Quotes",
+        APIData: selectedTemplateData
+    });
+
+    console.log("CREATE QUOTE: ", response);
+
+    const result = response.data[0];
+    if (result.code === "SUCCESS") {
+        created_quote_id = result.details.id;
+
+        const prospectResponse = await ZOHO.CRM.API.getRecord({
+            Entity: "Deals",
+            approved: "both",
+            RecordID: currentRecordId,
+        });
+        const currentProspect = prospectResponse.data[0];
+
+        const dbc = currentProspect.Clearance_for_Dashboard_Commission;
+        const proc = currentProspect.Clearance_for_Processing;
+
+        // UPDATE DEAL IF ANY CLEARANCE IS FALSE //
+        if (dbc === false || dbc === "false" || proc === false || proc === "false") {
+            const updated = await update_record();
+            if (!updated) {
+                submitButton.disabled = false;
+                buttonText.textContent = 'Create Quote';
+                spinner.classList.add('hidden');
+                return;
+            }
+            showModal('Success', 'New Quote record successfully created based on the selected existing Quote.', true);
+            console.log("Updating Deal → One or both clearance fields are FALSE");
+            setTimeout(closeWidget, 2000);
+
+            window.open(`https://crm.zoho.com/crm/org682300086/tab/Quotes/${created_quote_id}`, "_blank").focus();
+        } else {
+            const errorMsg = 'The quote cannot be created as the prospect is already cleared by Finance Dept';
+            showModal('Submission Error', errorMsg, false);
+            console.log("Both clearance fields TRUE → NOT updating Deal");
+        }
+
+    }
+}
+
+async function update_record() {
+    const prospectData = {
+        id: currentRecordId,
+        Quote_Assigned: created_quote_id
     };
 
     try {
-        const quote_res = await ZOHO.CRM.FUNCTIONS.execute(func_name, req_data);
-        console.log("Quote Creation Function Response:", quote_res);
+        const updateProspect = await ZOHO.CRM.API.updateRecord({
+            Entity: "Deals",
+            APIData: prospectData
+        });
 
-        const userMessage = quote_res?.details?.userMessage;
-
-        // Check for successful execution and a 'true' message from the custom function
-        if (quote_res.code === 'SUCCESS' && userMessage && userMessage.includes('true')) {
-            console.log('New Quote record successfully initiated via Zoho Function.');
-            showModal('Success', 'New Quote record successfully created based on the selected existing Quote.', true);
-            clearForm();
-            setTimeout(closeWidget, 2000); 
-        } else {
-            console.error("Zoho function did not return clear success:", quote_res);
-            const errorMsg = 'Failed to create Quote. The Zoho function reported an issue or returned an unexpected response.';
-            showModal('Submission Error', errorMsg, false);
+        const updateResult = updateProspect.data[0];
+        if (updateResult.code !== "SUCCESS") {
+            console.error("Zoho update did not return clear success:", updateProspect);
+            showModal('Submission Error','Failed to update the Prospect. The Zoho update function returned an unexpected response.',false);
+            return false;
         }
+
+        return true;
 
     } catch (error) {
-        console.error("Critical error during Zoho submission:", error);
-        showModal('API Error', 'A critical error occurred while communicating with Zoho CRM. Please check the console for details.', false);
-    } finally {
-        // Reset button state only if it was disabled by this function
-        if (submitButton.disabled) {
-            submitButton.disabled = false;
-            buttonText.textContent = 'Create Quote';
-            loadingSpinner.classList.add('hidden');
-        }
+        console.error("Error updating Deal:", error);
+        showModal('Submission Error','Failed to update the Prospect. Zoho returned an internal error.',false);
+        return false;
     }
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+    
+    const modal = document.getElementById("notification-modal");
+    const modalBox = modal.querySelector("div");
+    const modalCloseBtn = document.getElementById("modal-close-btn");
 
-// --- Initialization and Main Event Listener ---
-document.addEventListener("DOMContentLoaded", function () {
+    modalCloseBtn.addEventListener("click", () => {
+        modalBox.classList.remove("scale-100");
+        modalBox.classList.add("scale-95");
+        modal.classList.add("opacity-0");
 
-    // 1. Form Submission Listener
-    form.addEventListener("submit", function (event) {
-        event.preventDefault();
-        
-        const config = fieldsConfig.find(c => c.id === 'template-select');
-        const selectedValue = templateSelect.value.trim();
-        const isPlaceholderSelected = templateSelect.selectedIndex === 0 || !selectedValue;
-
-        setError(templateSelect, "");
-
-        // Mandatory validation check
-        if (isPlaceholderSelected) {
-            setError(templateSelect, `${config.label} selection is mandatory.`);
-            showModal('Action Required', `Please select an **${config.label}** from the dropdown list before clicking 'Create Quote'.`, false);
-            return;
-        }
-
-        createQuoteInZoho();
+        setTimeout(() => {
+            modal.classList.add("hidden");
+        }, 150);
     });
 
-    // 2. Initialize the Zoho SDK and load data upon ready state
+
     ZOHO.embeddedApp.on("PageLoad", async (entity) => {
         try {
-            // Get context information (Module and ID)
             currentRecordId = entity.EntityId ? entity.EntityId[0] : null;
-            currentModule = entity.Entity; // e.g., 'Deals' or 'Quotes'
-            
-            console.log(`Widget loaded on module: ${currentModule}, Record ID: ${currentRecordId}`);
+            currentModule = entity.Entity;
 
-            // 1. Fetch data for the dropdown
-            await loadDropdownData(); 
 
-            // 2. Enable UI elements if data was loaded
+            const getProspect = await ZOHO.CRM.API.getRecord({
+                Entity: "Deals",
+                approved: "both",
+                RecordID: currentRecordId,
+            });
+            const loadProspect = getProspect.data[0];
+
+            account_id = loadProspect.Account_Name.id;
+            contact_id = loadProspect.Contact_Name.id;
+            prospect_id = currentRecordId;
+
+            console.log("ACCOUNT_ID: " , account_id);
+            console.log("CONTACT_ID: " , contact_id);
+            console.log("PROSPECT_ID: " , prospect_id);
+
+            await loadDropdownData();
+
             if (templateSelect.options.length > 1 && currentRecordId) {
                 submitButton.disabled = false;
             }
-
-            // 3. (Optional) Fetch the current Deal/Quote record details for context
-            if (currentRecordId && currentModule === "Deals") {
-                const recordResponse = await ZOHO.CRM.API.getRecord({
-                    Entity: currentModule, approved: "both", RecordID: currentRecordId
-                });
-
-                if (recordResponse.data && recordResponse.data.length > 0) {
-                    console.log("Parent Record Data fetched successfully.");
-                }
-            }
         } catch (error) {
-            console.error("Initialization error:", error);
-            showModal('Initialization Failed', 'Could not load required data from Zoho CRM. See console for details.', false);
-            templateSelect.options[0].textContent = "Failed to load Quotes";
+            console.error("Error during PageLoad:", error);
         }
     });
 
-    // Start the SDK initialization process
     ZOHO.embeddedApp.init();
 });
