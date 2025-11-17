@@ -1,5 +1,5 @@
 // GLOBAL VARIABLE(S) :)
-let currentRecordId, created_quote_id, account_id, prospect_id, contact_id = null;
+let currentRecordId, created_quote_id, account_id, prospect_id, contact_id, dbc, proc = null;
 
 const templateSelect = document.getElementById("template-select");
 const loadingOverlay = document.getElementById("loadingOverlay");
@@ -38,6 +38,35 @@ async function closeWidget() {
     await ZOHO.CRM.UI.Popup.closeReload().catch(err => console.error("Error closing widget:", err));
 }
 
+// get the last working or business day of the month huehueheu
+function lastBusinessDayOfMonthFormatted(year, month) {
+    var date = new Date();
+    
+    if (typeof year === 'undefined' || year === null) {
+        year = date.getFullYear();
+    }
+    
+    if (typeof month === 'undefined' || month === null) {
+        month = date.getMonth();
+    }
+
+    // Get last day of the month
+    var result = new Date(year, month + 1, 0);
+
+    // Move back if weekend
+    while (result.getDay() === 0 || result.getDay() === 6) {
+        result.setDate(result.getDate() - 1);
+    }
+
+    // Format YYYY-MM-DD
+    var yyyy = result.getFullYear();
+    var mm = String(result.getMonth() + 1).padStart(2, '0'); // Month is 0-based
+    var dd = String(result.getDate()).padStart(2, '0');
+
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+
 async function loadDropdownData() {
     while (templateSelect.options.length > 1) { templateSelect.remove(1); }
     templateSelect.disabled = true;
@@ -59,7 +88,7 @@ async function loadDropdownData() {
         quoteRespo.forEach(q => {
             const option = document.createElement("option");
             option.value = q.id;
-            option.textContent = q.Subject;
+            option.textContent = q.Template_Name_Sales;
             option.dataset.quoteNumber = q.Quote_Number;
             option.dataset.quoteStage = q.Quote_Stage;
             option.dataset.currency = q.Currency;
@@ -67,7 +96,7 @@ async function loadDropdownData() {
             option.dataset.accountName = q.Account_Name?.id || "";
             option.dataset.dealName = q.Deal_Name?.id || "";
             option.dataset.templateName = q.Template_Name_Sales || "";
-            option.dataset.validTill = q.Valid_Till || "";
+            option.dataset.subject = q.Subject || "";
             option.dataset.productDetails = JSON.stringify(q.Product_Details);
             templateSelect.appendChild(option);
         });
@@ -86,8 +115,40 @@ async function loadDropdownData() {
     }
 }
 
+// GET ALL CURRENT PROSPECT'S RELATED QUOTES RECORD lxcvksofedhglsmb
+async function fetchRelatedQuotes(currentRecordId) {
+    try {
+        const function_name = "related_prospect_and_quote_records";
+        const req_data = {
+            "arguments": JSON.stringify({
+                "prospect_id": currentRecordId
+            })
+        };
+
+        const response = await ZOHO.CRM.FUNCTIONS.execute(function_name, req_data);
+
+        let raw = response.details.output;
+        raw = "[" + raw.replace(/}\s*{/g, "},{") + "]";
+        let parsed = JSON.parse(raw);
+        const relatedQuotes = parsed[0] || [];
+
+        // FILTER ALL RECORD THAT ARE NOT LINKED TO PROSPECT SVXBCVXCBVXCBXCVBXCB
+        const linkedQuotes = relatedQuotes.filter(q => q.Quote_Linked_to_Prospect === true);
+        const allIds = linkedQuotes.map(q => q.id);
+
+        console.log("Linked Quote IDs:", allIds);
+
+        return allIds;
+
+    } catch (err) {
+        console.error("Error fetching related quotes:", err);
+        return [];
+    }
+}
+
 document.getElementById("record-form").addEventListener("submit", createQuoteInZoho);
 
+// CREATE QUOTE RECORDS
 async function createQuoteInZoho(event) {
     event.preventDefault();
 
@@ -120,8 +181,6 @@ async function createQuoteInZoho(event) {
         Quote_Number: selectedOption.dataset.quoteNumber,
         Currency: selectedOption.dataset.currency,
         Grand_Total: selectedOption.dataset.grandTotal,
-        Template_Name_Sales: selectedOption.dataset.templateName,
-        Valid_Till: selectedOption.dataset.validTill,
         Product_Details: productDetails,
         Finance_Clearance: false,
         Process_Clearance: false,
@@ -130,9 +189,22 @@ async function createQuoteInZoho(event) {
         Quote_Linked_to_Prospect: true,
         Account_Name: account_id,
         Deal_Name: prospect_id,
-        Contact_Name: contact_id
+        Contact_Name: contact_id,
+        Valid_Till: lastBusinessDayOfMonthFormatted()
     };
     
+    const dbcBool = dbc === true || dbc === "true";
+    const procBool = proc === true || proc === "true";
+
+    if (dbcBool || procBool) {
+        const errorMsg = 'The quote cannot be created as the prospect is already cleared by Finance Dept';
+        showModal('Submission Error', errorMsg, false);
+        submitButton.disabled = false;
+        buttonText.textContent = 'Create Quote';
+        spinner.classList.add('hidden');
+        console.log("Quote creation blocked → dbc or proc is TRUE");
+        return;
+    }
 
     const response = await ZOHO.CRM.API.insertRecord({
         Entity: "Quotes",
@@ -145,18 +217,8 @@ async function createQuoteInZoho(event) {
     if (result.code === "SUCCESS") {
         created_quote_id = result.details.id;
 
-        const prospectResponse = await ZOHO.CRM.API.getRecord({
-            Entity: "Deals",
-            approved: "both",
-            RecordID: currentRecordId,
-        });
-        const currentProspect = prospectResponse.data[0];
-
-        const dbc = currentProspect.Clearance_for_Dashboard_Commission;
-        const proc = currentProspect.Clearance_for_Processing;
-
         // UPDATE DEAL IF ANY CLEARANCE IS FALSE //
-        if (dbc === false || dbc === "false" || proc === false || proc === "false") {
+        if ((dbc === false || dbc === "false") && (proc === false || proc === "false")) {
             const updated = await update_record();
             if (!updated) {
                 submitButton.disabled = false;
@@ -172,39 +234,78 @@ async function createQuoteInZoho(event) {
         } else {
             const errorMsg = 'The quote cannot be created as the prospect is already cleared by Finance Dept';
             showModal('Submission Error', errorMsg, false);
+            submitButton.disabled = false;
+            buttonText.textContent = 'Create Quote';
+            spinner.classList.add('hidden');
             console.log("Both clearance fields TRUE → NOT updating Deal");
         }
 
     }
 }
 
-async function update_record() {
-    const prospectData = {
-        id: currentRecordId,
-        Quote_Assigned: created_quote_id
-    };
 
+// UPDATE PROSPECT RECORD
+async function update_record() {
     try {
-        const updateProspect = await ZOHO.CRM.API.updateRecord({
+        const prospectUpdate = await ZOHO.CRM.API.updateRecord({
             Entity: "Deals",
-            APIData: prospectData
+            APIData: {
+                id: currentRecordId,
+                Quote_Assigned: created_quote_id
+            }
         });
 
-        const updateResult = updateProspect.data[0];
-        if (updateResult.code !== "SUCCESS") {
-            console.error("Zoho update did not return clear success:", updateProspect);
-            showModal('Submission Error','Failed to update the Prospect. The Zoho update function returned an unexpected response.',false);
+        const prospectResult = prospectUpdate.data[0];
+        if (prospectResult.code !== "SUCCESS") {
+            console.error("Prospect update failed:", prospectUpdate);
+            showModal(
+                'Submission Error',
+                'Failed to update the Prospect. Zoho returned an unexpected response.',
+                false
+            );
             return false;
+        }
+
+        const allQuoteIds = await fetchRelatedQuotes(currentRecordId);
+        console.log("Related Quote IDs:", allQuoteIds);
+
+        for (const quoteId of allQuoteIds) {
+
+            const isNewQuote = (quoteId === created_quote_id);
+
+            const quoteUpdate = await ZOHO.CRM.API.updateRecord({
+                Entity: "Quotes",
+                APIData: {
+                    id: quoteId,
+                    Quote_Linked_to_Prospect: isNewQuote
+                }
+            });
+
+            const result = quoteUpdate.data[0];
+            if (result.code !== "SUCCESS") {
+                console.error(`Failed updating Quote ${quoteId}:`, quoteUpdate);
+                showModal(
+                    'Submission Error',
+                    `Failed to update Quote ID ${quoteId}. Zoho returned an unexpected response.`,
+                    false
+                );
+                return false;
+            }
         }
 
         return true;
 
     } catch (error) {
-        console.error("Error updating Deal:", error);
-        showModal('Submission Error','Failed to update the Prospect. Zoho returned an internal error.',false);
+        console.error("Error inside update_record():", error);
+        showModal(
+            'Submission Error',
+            'Failed to update Prospect and related Quotes due to an internal error.',
+            false
+        );
         return false;
     }
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
     
@@ -225,9 +326,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     ZOHO.embeddedApp.on("PageLoad", async (entity) => {
         try {
+            ZOHO.CRM.UI.Resize({ height: "45%"}).then(function(data) {
+                console.log("Resize result:", data);
+            });
+
             currentRecordId = entity.EntityId ? entity.EntityId[0] : null;
             currentModule = entity.Entity;
 
+            await fetchRelatedQuotes(currentRecordId);
 
             const getProspect = await ZOHO.CRM.API.getRecord({
                 Entity: "Deals",
@@ -236,13 +342,14 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const loadProspect = getProspect.data[0];
 
+            console.log("THE PROSPECT ", loadProspect);
+
             account_id = loadProspect.Account_Name.id;
             contact_id = loadProspect.Contact_Name.id;
             prospect_id = currentRecordId;
 
-            console.log("ACCOUNT_ID: " , account_id);
-            console.log("CONTACT_ID: " , contact_id);
-            console.log("PROSPECT_ID: " , prospect_id);
+            dbc = loadProspect.Clearance_for_Dashboard_Commission;
+            proc = loadProspect.Clearance_for_Processing;
 
             await loadDropdownData();
 
