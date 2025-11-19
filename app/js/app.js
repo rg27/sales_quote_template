@@ -247,17 +247,20 @@ async function createQuoteInZoho(event) {
 // UPDATE PROSPECT RECORD
 async function update_record() {
     try {
-        const prospectUpdate = await ZOHO.CRM.API.updateRecord({
-            Entity: "Deals",
-            APIData: {
-                id: currentRecordId,
-                Quote_Assigned: created_quote_id
-            }
-        });
+        const update_prospect_function = "sales_quote_template_update_prospect";
+        const prospect_data = {
+            "arguments": JSON.stringify({
+                "id": currentRecordId,
+                "quote_assigned": created_quote_id
+            })
+        }
 
-        const prospectResult = prospectUpdate.data[0];
-        if (prospectResult.code !== "SUCCESS") {
-            console.error("Prospect update failed:", prospectUpdate);
+        const prospect_response = await ZOHO.CRM.FUNCTIONS.execute(update_prospect_function, prospect_data);
+        const prospectResult = prospect_response;
+        console.log(prospectResult);
+
+        if (prospectResult.code !== "success") {
+            console.error("Prospect update failed:", prospect_response);
             showModal(
                 'Submission Error',
                 'Failed to update the Prospect. Zoho returned an unexpected response.',
@@ -266,6 +269,8 @@ async function update_record() {
             return false;
         }
 
+
+        // UPDATE QUOTES Quote_Linked_to_Prospect
         const allQuoteIds = await fetchRelatedQuotes(currentRecordId);
         console.log("Related Quote IDs:", allQuoteIds);
 
@@ -273,16 +278,18 @@ async function update_record() {
 
             const isNewQuote = (quoteId === created_quote_id);
 
-            const quoteUpdate = await ZOHO.CRM.API.updateRecord({
-                Entity: "Quotes",
-                APIData: {
-                    id: quoteId,
-                    Quote_Linked_to_Prospect: isNewQuote
-                }
-            });
+            const update_quote_function = "sales_quote_template_update_quote";
+            const quote_data = {
+                "arguments": JSON.stringify({
+                    "id": quoteId,
+                    "quote_linked_to_prospect": isNewQuote
+                })
+            }
 
-            const result = quoteUpdate.data[0];
-            if (result.code !== "SUCCESS") {
+            const quote_response = await ZOHO.CRM.FUNCTIONS.execute(update_quote_function, quote_data);
+            const quote_result = quote_response;
+            
+            if (quote_result.code !== "success") {
                 console.error(`Failed updating Quote ${quoteId}:`, quoteUpdate);
                 showModal(
                     'Submission Error',
@@ -292,7 +299,6 @@ async function update_record() {
                 return false;
             }
         }
-
         return true;
 
     } catch (error) {
