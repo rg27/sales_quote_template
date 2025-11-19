@@ -97,6 +97,12 @@ async function loadDropdownData() {
             option.dataset.dealName = q.Deal_Name?.id || "";
             option.dataset.templateName = q.Template_Name_Sales || "";
             option.dataset.subject = q.Subject || "";
+            option.dataset.crmLicenseProduct = q.CRM_License_Product || "";
+            option.dataset.crmLicenseDescription = q.CRM_License_Description || "";
+            option.dataset.balance = q.Balance || "";
+            option.dataset.crmJurisdiction = q.CRM_Jurisdiction || "";
+            option.dataset.termnsAndConditions = q.Terms_and_Conditions || "";
+            option.dataset.commissionAmount = q.Commission_Amount || "";
             option.dataset.productDetails = JSON.stringify(q.Product_Details);
             templateSelect.appendChild(option);
         });
@@ -130,14 +136,16 @@ async function fetchRelatedQuotes(currentRecordId) {
         let raw = response.details.output;
         raw = "[" + raw.replace(/}\s*{/g, "},{") + "]";
         let parsed = JSON.parse(raw);
-        const relatedQuotes = parsed[0] || [];
 
-        // FILTER ALL RECORD THAT ARE NOT LINKED TO PROSPECT SVXBCVXCBVXCBXCVBXCB
-        const linkedQuotes = relatedQuotes.filter(q => q.Quote_Linked_to_Prospect === true);
-        const allIds = linkedQuotes.map(q => q.id);
+        if (!Array.isArray(parsed)) {
+            console.error("Function output is not an array:", parsed);
+            return [];
+        }
+
+        const relatedQuotes = parsed;
+        const allIds = relatedQuotes.map(q => q.id);
 
         console.log("Linked Quote IDs:", allIds);
-
         return allIds;
 
     } catch (err) {
@@ -145,6 +153,7 @@ async function fetchRelatedQuotes(currentRecordId) {
         return [];
     }
 }
+
 
 document.getElementById("record-form").addEventListener("submit", createQuoteInZoho);
 
@@ -186,10 +195,14 @@ async function createQuoteInZoho(event) {
         Process_Clearance: false,
         Processed_by_SE: false,
         Quote_Stage: "Draft",
-        Quote_Linked_to_Prospect: true,
         Account_Name: account_id,
         Deal_Name: prospect_id,
-        Contact_Name: contact_id,
+        CRM_License_Product: selectedOption.crmLicenseProduct,
+        CRM_License_Description: selectedOption.crmLicenseDescription,
+        Balance: selectedOption.balance,
+        CRM_Jurisdiction: selectedOption.crmJurisdiction,
+        Terms_and_Conditions: selectedOption.termnsAndConditions,
+        Commission_Amount: selectedOption.commissionAmount,
         Valid_Till: lastBusinessDayOfMonthFormatted()
     };
     
@@ -228,9 +241,9 @@ async function createQuoteInZoho(event) {
             }
             showModal('Success', 'New Quote record successfully created based on the selected existing Quote.', true);
             console.log("Updating Deal → One or both clearance fields are FALSE");
-            setTimeout(closeWidget, 2000);
 
             window.open(`https://crm.zoho.com/crm/org682300086/tab/Quotes/${created_quote_id}`, "_blank").focus();
+
         } else {
             const errorMsg = 'The quote cannot be created as the prospect is already cleared by Finance Dept';
             showModal('Submission Error', errorMsg, false);
@@ -250,7 +263,7 @@ async function update_record() {
         const update_prospect_function = "sales_quote_template_update_prospect";
         const prospect_data = {
             "arguments": JSON.stringify({
-                "id": currentRecordId,
+                "currentRecordId": currentRecordId,
                 "quote_assigned": created_quote_id
             })
         }
@@ -282,7 +295,8 @@ async function update_record() {
             const quote_data = {
                 "arguments": JSON.stringify({
                     "id": quoteId,
-                    "quote_linked_to_prospect": isNewQuote
+                    "quote_linked_to_prospect": isNewQuote,
+                    "contact_id": contact_id
                 })
             }
 
@@ -314,18 +328,24 @@ async function update_record() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
-    
     const modal = document.getElementById("notification-modal");
     const modalBox = modal.querySelector("div");
     const modalCloseBtn = document.getElementById("modal-close-btn");
+    const modalTitle = document.getElementById('modal-title');
 
-    modalCloseBtn.addEventListener("click", () => {
+    modalCloseBtn.addEventListener("click", async () => {
         modalBox.classList.remove("scale-100");
         modalBox.classList.add("scale-95");
         modal.classList.add("opacity-0");
 
-        setTimeout(() => {
+        const isSuccess = modalTitle.classList.contains('text-green-600'); 
+
+        setTimeout(async () => {
             modal.classList.add("hidden");
+
+            if (isSuccess) {
+                await closeWidget();
+            }
         }, 150);
     });
 
@@ -347,8 +367,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 RecordID: currentRecordId,
             });
             const loadProspect = getProspect.data[0];
-
-            console.log("THE PROSPECT ", loadProspect);
 
             account_id = loadProspect.Account_Name.id;
             contact_id = loadProspect.Contact_Name.id;
