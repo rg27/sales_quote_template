@@ -67,22 +67,58 @@ function lastBusinessDayOfMonthFormatted(year, month) {
 }
 
 
+function collectFormData() {
+    formData = {
+        jurisdiction: document.getElementById("crm-jurisdiction").value || "",
+        licensePackage: document.getElementById("license-package").value || "",
+    };
+    return formData;
+}
+
+
 async function loadDropdownData() {
     while (templateSelect.options.length > 1) { templateSelect.remove(1); }
     templateSelect.disabled = true;
 
     try {
         const func_name = "filter_quote_records";
-        const response = await ZOHO.CRM.FUNCTIONS.execute(func_name, {});
+        const response = await ZOHO.CRM.FUNCTIONS.execute(func_name, formData);
         let raw = response.details.output;
 
         raw = "[" + raw.replace(/}\s*{/g, "},{") + "]";
-
         let quoteRespo = JSON.parse(raw);
 
         if (!Array.isArray(quoteRespo)) {
             quoteRespo = [quoteRespo];
         }
+
+        // --- UPDATED SORTING LOGIC vcjbhdkbhlsldb
+        const extractYearNumber = (name) => {
+            const match = name.match(/(\d+) (Years?|Year)/i);
+            return match ? parseInt(match[1], 10) : 0; 
+        };
+
+        const extractVisaSolutionNumber = (name) => {
+            const match = name.match(/(\d+) Visa Solution/i);
+            return match ? parseInt(match[1], 10) : 0; 
+        };
+
+        quoteRespo.sort((a, b) => {
+            const nameA = a.Template_Name_Sales || "";
+            const nameB = b.Template_Name_Sales || "";
+
+            const yearA = extractYearNumber(nameA);
+            const yearB = extractYearNumber(nameB);
+
+            if (yearA !== yearB) {
+                return yearA - yearB;
+            }
+
+            const visaA = extractVisaSolutionNumber(nameA);
+            const visaB = extractVisaSolutionNumber(nameB);
+            
+            return visaA - visaB;
+        });
 
         templateSelect.innerHTML = '<option value="" disabled selected>Select Quote Template</option>';
         quoteRespo.forEach(q => {
@@ -328,6 +364,64 @@ async function update_record() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
+    const crmSelect = document.getElementById("crm-jurisdiction");
+    const licenseSelect = document.getElementById("license-package");
+
+    const clearJurisdictionBtn = document.getElementById("clear-crm-jurisdiction");
+    const clearLicenseBtn = document.getElementById("clear-license-package");
+
+    const updateClearButtonVisibility = () => {
+        // Hide if value is empty/null, show otherwise :))
+        if (crmSelect.value) {
+            clearJurisdictionBtn.classList.remove("hidden");
+        } else {
+            clearJurisdictionBtn.classList.add("hidden");
+        }
+
+        if (licenseSelect.value) {
+            clearLicenseBtn.classList.remove("hidden");
+        } else {
+            clearLicenseBtn.classList.add("hidden");
+        }
+    };
+
+    // CLEAR JURISDICTION
+    clearJurisdictionBtn.addEventListener("click", () => {
+        crmSelect.value = "";
+        clearJurisdictionBtn.classList.add("hidden");
+        const updatedFormData = collectFormData();
+        loadDropdownData(updatedFormData);
+    });
+
+    // CLEAR LICENSE PACKAGE 
+    clearLicenseBtn.addEventListener("click", () => {
+        licenseSelect.value = "";
+        clearLicenseBtn.classList.add("hidden");
+        const updatedFormData = collectFormData();
+        loadDropdownData(updatedFormData);
+    });
+
+    [crmSelect, licenseSelect].forEach(select => {
+        select.addEventListener("change", () => {
+            const updatedFormData = collectFormData();
+            console.log("Updated formData:", updatedFormData);
+
+            // SHOW OR HIDE ✕ BUTTONS
+            if (select === crmSelect) {
+                if (crmSelect.value) clearJurisdictionBtn.classList.remove("hidden");
+                else clearJurisdictionBtn.classList.add("hidden");
+            }
+            if (select === licenseSelect) {
+                if (licenseSelect.value) clearLicenseBtn.classList.remove("hidden");
+                else clearLicenseBtn.classList.add("hidden");
+            }
+
+            updateClearButtonVisibility();
+
+            loadDropdownData(updatedFormData);
+        });
+    });
+
     const modal = document.getElementById("notification-modal");
     const modalBox = modal.querySelector("div");
     const modalCloseBtn = document.getElementById("modal-close-btn");
@@ -352,9 +446,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     ZOHO.embeddedApp.on("PageLoad", async (entity) => {
         try {
-            ZOHO.CRM.UI.Resize({ height: "45%"}).then(function(data) {
+            ZOHO.CRM.UI.Resize({ height: "60%"}).then(function(data) {
                 console.log("Resize result:", data);
             });
+
+            formData = { jurisdiction: "", licensePackage: "" };
+            loadDropdownData(formData);
+
 
             currentRecordId = entity.EntityId ? entity.EntityId[0] : null;
             currentModule = entity.Entity;
@@ -375,8 +473,6 @@ document.addEventListener("DOMContentLoaded", () => {
             dbc = loadProspect.Clearance_for_Dashboard_Commission;
             proc = loadProspect.Clearance_for_Processing;
 
-            await loadDropdownData();
-
             if (templateSelect.options.length > 1 && currentRecordId) {
                 submitButton.disabled = false;
             }
@@ -384,6 +480,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Error during PageLoad:", error);
         }
     });
+    
+    updateClearButtonVisibility();
 
     ZOHO.embeddedApp.init();
 });

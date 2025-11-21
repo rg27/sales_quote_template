@@ -58,6 +58,24 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .form-input-small {
+            padding: 0.375rem 0.5rem;
+            font-size: 0.825rem;
+            line-height: 1.25rem;
+        }
+        .form-label-small {
+            font-size: 0.825rem;
+            margin-bottom: 0.25rem;
+        }
+
+        /* --- NEW STYLES TO HIDE DEFAULT DROPDOWN ARROW --- */
+        .form-select-no-arrow {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        /* ---------------------------------------------------- */
     </style>
 </head>
 <body class="bg-gray-50 p-4 flex justify-center">
@@ -69,30 +87,95 @@
         <p class="text-sm text-gray-500 mb-4" id="zoho-context-info">
             </p>
 
-        <form id="record-form" novalidate>
-            <div class="grid grid-cols-1 gap-x-6 gap-y-3">
+<form id="record-form" novalidate>
 
-                <div class="space-y-3 md:col-span-2">
-                    <div>
-                        <label for="template-select" class="block text-sm font-medium text-gray-700">Select Quote Template <span class="text-red-500">*</span></label>
-                        <select id="template-select" name="template-select" class="form-input mt-1 block w-full border border-gray-300 rounded-lg shadow-sm bg-white cursor-pointer" disabled>
-                            <option value="" disabled selected>Loading Quotes Templates...</option>
-                        </select>
-                        <span class="error-message" id="error-template-select"></span>
-                    </div>
-                </div>
-                
-                <div class="mt-4 pt-3 border-t md:col-span-2 flex justify-end">
-                    <button type="submit" id="submit_button_id" class="flex items-center justify-center px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-offset-2 transition duration-300 ease-in-out text-sm disabled:bg-indigo-400" disabled>
-                        <svg id="loading-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span id="button-text">Create Quote</span>
-                    </button>
-                </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+            <label for="crm-jurisdiction" class="block form-label-small text-gray-700">
+                CRM_Jurisdiction
+            </label>
+            <div class="relative mt-1"> 
+                <select id="crm-jurisdiction" name="CRM_Jurisdiction"
+                    class="form-input form-input-small block w-full border border-gray-300 rounded-lg shadow-sm bg-white cursor-pointer pr-8 form-select-no-arrow">
+                    <option value="" disabled selected>Select Jurisdiction...</option>
+                    <option value="ADGM">ADGM</option>
+                    <option value="AJMAN">AJMAN</option>
+                    <option value="DAFZA">DAFZA</option>
+                    <option value="DIFC">DIFC</option>
+                    <option value="DMCC">DMCC</option>
+                    <option value="DMC">DMC</option>
+                    <option value="DSP">DSP</option>
+                    <option value="DWC-Freelance">DWC-Freelance</option>
+                    <option value="IFZA">IFZA</option>
+                    <option value="Mainland-Dubai">Mainland-Dubai</option>
+                    <option value="Mainland-RAK">Mainland-RAK</option>
+                    <option value="MEYDAN">MEYDAN</option>
+                    <option value="RAK Offshore">RAK Offshore</option>
+                    <option value="SHAMS">SHAMS</option>
+                    <option value="SPC">SPC</option>
+                </select>
+
+                <button type="button" id="clear-crm-jurisdiction"
+                    class="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 bg-transparent text-sm font-bold z-10 hidden"
+                >✕</button>
             </div>
-        </form>
+            <span class="error-message" id="error-crm-jurisdiction"></span>
+        </div>
+
+        <div>
+            <label for="license-package" class="block form-label-small text-gray-700">
+                License Package
+            </label>
+            <div class="relative mt-1">
+                <select id="license-package" name="License_Package"
+                    class="form-input form-input-small block w-full border border-gray-300 rounded-lg shadow-sm bg-white cursor-pointer pr-8 form-select-no-arrow">
+                    <option value="" disabled selected>Select License Package...</option>
+                    <option value="Zero Visa License">Zero Visa License</option>
+                    <option value="1 Visa License">1 Visa License</option>
+                    <option value="2 Visa License">2 Visa License</option>
+                    <option value="3 Visa License">3 Visa License</option>
+                    <option value="4 Visa License">4 Visa License</option>
+                    <option value="5 Visa License">5 Visa License</option>
+                    <option value="6 Visa License">6 Visa License</option>
+                </select>
+
+                <button type="button" id="clear-license-package"
+                    class="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 bg-transparent text-sm font-bold z-10 hidden"
+                >✕</button>
+            </div>
+            <span class="error-message" id="error-license-package"></span>
+        </div>
+
+
+    </div>
+
+    <div class="mb-4">
+        <label for="template-select" class="block text-sm font-medium text-gray-700">
+            Select Quote Template <span class="text-red-500">*</span>
+        </label>
+        <select id="template-select" name="template-select"
+            class="form-input mt-1 block w-full border border-gray-300 rounded-lg shadow-sm bg-white cursor-pointer" disabled>
+            <option value="" disabled selected>Loading Quotes Templates...</option>
+        </select>
+        <span class="error-message" id="error-template-select"></span>
+    </div>
+
+    <div class="mt-4 pt-3 border-t flex justify-end">
+        <button type="submit" id="submit_button_id"
+            class="flex items-center justify-center px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-offset-2 transition duration-300 ease-in-out text-sm disabled:bg-indigo-400"
+            disabled>
+            <svg id="loading-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="button-text">Create Quote</span>
+        </button>
+    </div>
+</form>
+
+
     </div>
 
     <div id="loadingOverlay" style="display: none;">
