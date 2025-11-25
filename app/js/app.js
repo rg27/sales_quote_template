@@ -1,5 +1,5 @@
 // GLOBAL VARIABLE(S) :)
-let currentRecordId, created_quote_id, account_id, prospect_id, contact_id, dbc, proc = null;
+let currentRecordId, created_quote_id, account_id, prospect_id, contact_id, dbc, prospect_type, proc = null;
 
 const templateSelect = document.getElementById("template-select");
 const loadingOverlay = document.getElementById("loadingOverlay");
@@ -205,6 +205,19 @@ async function createQuoteInZoho(event) {
             false
         );
 
+        submitButton.disabled = false;
+        buttonText.textContent = 'Create Quote';
+        spinner.classList.add('hidden');
+
+        return;
+    }
+
+    if(prospect_type !== "New Trade License") {
+        showModal(
+            "Invalid Prospect Type", 
+            "Please make sure that Prospect Type is 'New Trade License'.", 
+            false
+        );
         submitButton.disabled = false;
         buttonText.textContent = 'Create Quote';
         spinner.classList.add('hidden');
@@ -469,6 +482,10 @@ document.addEventListener("DOMContentLoaded", () => {
             account_id = loadProspect.Account_Name.id;
             contact_id = loadProspect.Contact_Name.id;
             prospect_id = currentRecordId;
+
+            prospect_type = loadProspect.Type;
+
+            console.log(prospect_type);
 
             dbc = loadProspect.Clearance_for_Dashboard_Commission;
             proc = loadProspect.Clearance_for_Processing;
