@@ -92,7 +92,6 @@ async function loadDropdownData() {
             quoteRespo = [quoteRespo];
         }
 
-        // --- UPDATED SORTING LOGIC vcjbhdkbhlsldb
         const extractYearNumber = (name) => {
             const match = name.match(/(\d+) (Years?|Year)/i);
             return match ? parseInt(match[1], 10) : 0; 
@@ -106,6 +105,13 @@ async function loadDropdownData() {
         quoteRespo.sort((a, b) => {
             const nameA = a.Template_Name_Sales || "";
             const nameB = b.Template_Name_Sales || "";
+
+            if (nameA < nameB) {
+                return -1;
+            }
+            if (nameA > nameB) {
+                return 1;
+            }
 
             const yearA = extractYearNumber(nameA);
             const yearB = extractYearNumber(nameB);
