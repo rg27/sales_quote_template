@@ -94,22 +94,30 @@ async function loadDropdownData() {
 
         const extractYearNumber = (name) => {
             const match = name.match(/(\d+) (Years?|Year)/i);
-            return match ? parseInt(match[1], 10) : 0; 
+            return match ? parseInt(match[1], 10) : 0;
         };
 
         const extractVisaSolutionNumber = (name) => {
-            const match = name.match(/(\d+) Visa Solution/i);
-            return match ? parseInt(match[1], 10) : 0; 
+            const match = name.match(/(\d+) Visa (Solution|License)/i);
+            return match ? parseInt(match[1], 10) : 0;
         };
+        
+        const extractFirstPart = (name) => {
+            const match = name.match(/^([^-]+)/); 
+            return match ? match[1].trim().toUpperCase() : name.trim().toUpperCase();
+        }
 
         quoteRespo.sort((a, b) => {
             const nameA = a.Template_Name_Sales || "";
             const nameB = b.Template_Name_Sales || "";
 
-            if (nameA < nameB) {
+            const partA = extractFirstPart(nameA);
+            const partB = extractFirstPart(nameB);
+
+            if (partA < partB) {
                 return -1;
             }
-            if (nameA > nameB) {
+            if (partA > partB) {
                 return 1;
             }
 
@@ -122,8 +130,19 @@ async function loadDropdownData() {
 
             const visaA = extractVisaSolutionNumber(nameA);
             const visaB = extractVisaSolutionNumber(nameB);
+
+            if (visaA !== visaB) {
+                return visaA - visaB;
+            }
             
-            return visaA - visaB;
+            if (nameA < nameB) {
+                return -1;
+            }
+            if (nameA > nameB) {
+                return 1;
+            }
+
+            return 0;
         });
 
         templateSelect.innerHTML = '<option value="" disabled selected>Select Quote Template</option>';
@@ -158,7 +177,7 @@ async function loadDropdownData() {
         console.error("Error loading dropdown data:", err);
         errorTemplate.textContent = "Failed to load quote templates.";
         templateSelect.options[0].textContent = 'Error Loading Quotes';
-        templateSelect.options[0].value = ''; 
+        templateSelect.options[0].value = '';
         templateSelect.disabled = true;
     }
 }
